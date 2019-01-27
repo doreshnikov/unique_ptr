@@ -1,0 +1,11 @@
+cmake-build-debug/
+CMakeFiles/
+.git/
+.idea/
+
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+unique_ptr.cbp
+unique_ptr
