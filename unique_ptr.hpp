@@ -14,9 +14,13 @@ namespace my {
 
         struct holder_base;
 
+    public:
+
         typedef T *pointer;
         typedef std::default_delete<T> d_delete;
         typedef holder_base *c_delete;
+
+    private:
 
         pointer _ptr;
         std::variant<c_delete, d_delete> _deleter;
@@ -50,6 +54,16 @@ namespace my {
                 (*std::get<c_delete>(_deleter))(ptr);
             }
         }
+
+        void clear_deleter() {
+            if (std::holds_alternative<c_delete>(_deleter)) {
+                delete std::get<c_delete>(_deleter);
+            }
+        }
+
+        template<typename U>
+        friend
+        class unique_ptr;
 
     public:
 
@@ -85,18 +99,17 @@ namespace my {
         }
 
         template<typename U>
-        unique_ptr(unique_ptr<U> &&u_ptr) : _ptr(u_ptr._ptr), _deleter(u_ptr._deleter) {
-            u_ptr._ptr = nullptr;
-            u_ptr._deleter = nullptr;
+        unique_ptr(unique_ptr<U> &&u_ptr) : _ptr(u_ptr._ptr) {
+            u_ptr.release();
+            _deleter = std::default_delete<T>();
         }
 
         template<typename U>
         unique_ptr &operator=(unique_ptr<U> &&u_ptr) {
             ~unique_ptr();
             _ptr = u_ptr._ptr;
-            _deleter = u_ptr._deleter;
+            _deleter = std::default_delete<T>();
             u_ptr._ptr = nullptr;
-            u_ptr._deleter = nullptr;
         }
 
         void swap(unique_ptr &u_ptr) noexcept {
@@ -110,15 +123,42 @@ namespace my {
             return ret;
         }
 
-        void reset(pointer ptr = nullptr) noexcept {
+        template<typename Deleter>
+        void reset(pointer ptr, Deleter &&deleter) {
             do_delete(_ptr);
             _ptr = ptr;
+            clear_deleter();
+            _deleter = new deleter_holder(std::forward<Deleter>(deleter));
+        }
+
+        void reset(pointer ptr) noexcept {
+            do_delete(_ptr);
+            _ptr = ptr;
+            clear_deleter();
+            _deleter = std::default_delete<T>();
+        }
+
+        template<typename U, typename Deleter = std::default_delete<T>>
+        void reset(U *ptr, Deleter deleter) {
+            do_delete(_ptr);
+            _ptr = ptr;
+            clear_deleter();
+            _deleter = new deleter_holder(std::forward<Deleter>(deleter));
         }
 
         template<typename U>
         void reset(U *ptr) noexcept {
-            do_delete(_ptr);
+            do_delete(ptr);
             _ptr = ptr;
+            clear_deleter();
+            _deleter = std::default_delete<T>();
+        }
+
+        void reset(nullptr_t) noexcept {
+            do_delete(_ptr);
+            _ptr = nullptr;
+            clear_deleter();
+            _deleter = std::default_delete<T>();
         }
 
         pointer get() const noexcept {
